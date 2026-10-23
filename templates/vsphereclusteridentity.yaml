@@ -1,0 +1,10 @@
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: VSphereClusterIdentity
+metadata:
+  name: {{ include "capvs-cluster.capvs.identityName" . }}
+  labels:
+    {{- include "capvs-cluster.labels" . | nindent 4 }}
+spec:
+  allowedNamespaces:
+    selector: {}
+  secretName: {{ include "capvs-cluster.capvs.credentialsSecretName" . }}

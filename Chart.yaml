@@ -1,0 +1,15 @@
+apiVersion: v2
+name: capvs-cluster
+description: Helm-чарт для развёртывания Cluster API-кластера на провайдере vSphere (CAPV) + Shturval ClusterConfig
+type: application
+version: 0.2.0
+appVersion: "2.14.0"
+dependencies:
+  - name: capsm-cluster-vm
+    alias: capvs-cluster-vm
+    repository: capsm-cluster-vm
+    condition: capvs-cluster-vm.enable
+  - name: capsm-cluster-grafana
+    alias: capvs-cluster-grafana
+    repository: capsm-cluster-grafana
+    condition: capvs-cluster-grafana.enable

@@ -1,0 +1,379 @@
+# Лицензия Штурвала (замените на реальную или передайте через --set / отдельный values-файл)
+licensetoken: "XXXXXXXX"
+# Имя хоста с зеркалом Штурвала
+systemregistry: myregistry.domain.tld
+
+# shturvalReleaseVersion: 2.11.0
+# kubeVersion: 1.33.1
+# shturvalReleaseVersion: 2.12.1
+# kubeVersion: 1.34.1
+# shturvalReleaseVersion: 2.13.1
+# kubeVersion: 1.34.3
+shturvalReleaseVersion: 2.14.0 # Версия устанавливаемого кластера Штурвал
+kubeVersion: 1.35.1 # Версия устанавливаемого кубернетеса
+
+# Актуальные образы в 2.14 для bootstrap NCI (pause / kube-vip) и cluster-autoscaler
+images:
+  pause: r.shturval.tech/pause:3.10.1
+  kubeVip: r.shturval.tech/kube-vip:v1.0.4-280041
+  # clusterAutoscaler: r.shturval.tech/autoscaling/cluster-autoscaler:v1.35.1 # по умолчанию: r.shturval.tech/autoscaling/cluster-autoscaler:v{{ kubeVersion }}
+
+services:
+  # Минимальный набор сервисов для 2.14 - значение применятся только в момент инициализации кластера и изменения ни к чему не приведут
+  enabledservices:
+  - shturval-node-config
+  - shturval-trust-manager
+  - shturval-node-config-crds
+  - shturval-snapshotter
+  - shturval-metrics-collector-crds
+  - shturval-vip-provider
+  - shturval-caching-dns
+  - shturval-vip
+  - shturval-networking
+  - shturval-policy-manager-crds
+  - shturval-cert-manager
+  - shturval-services-crds
+  - shturval-snapshotter-crds
+  - shturval-services
+  - shturval-trust-manager-crds
+  - shturval-monitoring-crds
+  - shturval-update
+  - shturval-ingress-controller
+  - shturval-local-csi
+  - shturval-update-crds
+  - shturval-cert-manager-crds
+  disablesservices:
+  - shturval-metrics-collector
+  - shturval-log-collector-crds
+  - shturval-backup
+  - shturval-scanner
+  - shturval-cd
+  - shturval-policy-manager
+  - shturval-scanner-crds
+  - shturval-rollouts
+  - shturval-cd-crds
+  - shturval-rollouts-crds
+  - shturval-gateway-api-crds
+  - shturval-descheduler
+  - shturval-backup-crds
+  - shturval-log-collector
+  - shturval-cert-expiration
+
+# Конфигурация etcd
+etcd:
+  external: {}
+    # endpoints:
+    #   - "https://10.31.145.174:2379"
+    # caCrt: "conf/ext_etcd-ca.crt"       # CA сертификат от ETCD
+    # apiCrt: "conf/ext_etcd-client.crt"  # Клиентский сертификат для подключения к ETCD
+    # apiKey: "conf/ext_etcd-client.key"  # Ключ от клиентского сертификата для подключения к ETCD
+  local:
+    dataDir: /var/lib/etcd
+    imageTag: v3.6.7
+    # extraArgs: {}
+
+# Инициализация узлов (ShturvalInit / nci.json)
+# Интерфейс для kube-vip VIP; образы pause/kube-vip задаются в images.*
+# Без kube-vip VIP на API не поднимается при useExternalKubeAPILB: false.
+nodeInit:
+  kubevip:
+    # Сетевой интерфейс на master-узле для kube-vip VIP (у VMware часто ens192 вместо eth0)
+    interface: "eth0"
+
+# Настройки для провайдера Cluster API Provider vSphere (CAPV)
+# Создаются: VSphereClusterIdentity (cluster-scoped) + Secret с креденшелами vCenter
+capvs:
+  # Имя VSphereClusterIdentity. По умолчанию = Release.Name
+  identityName: ""
+  # Namespace, в котором развёрнут CAPV-контроллер и должен лежать Secret с креденшелами
+  credentialsNamespace: capv-system
+  # Креденшелы подключения к vCenter
+  username: "administrator@vsphere.local"
+  password: "secret"
+  # Адрес vCenter сервера (FQDN или IP, опционально с портом)
+  server: "vcenter.example.com:443"
+  # SHA-1 отпечаток TLS-сертификата vCenter (colon-separated). Пусто => не валидировать TLS
+  thumbprint: ""
+  # Путь/имя Datacenter в vSphere (например "/Datacenter")
+  datacenter: "/Datacenter"
+  # Имя/путь Datastore
+  datastore: "Datastore"
+  # Inventory path до папки, в которой создаются VM
+  folder: "/Datacenter/vm/k8s-clusters"
+  # Inventory path до ResourcePool
+  resourcePool: "/Datacenter/host/Cluster/Resources/pool"
+  # Имя (или path) шаблона VM для клонирования. Должен быть подготовлен заранее (cloud-init + containerd + kubelet)
+  template: "shturval-node-template"
+  # Режим клонирования: linkedClone (быстро, требует snapshot на шаблоне) или fullClone
+  cloneMode: linkedClone
+  # Режим выключения: hard / soft / trySoft
+  powerOffMode: hard
+  # Политика storage policy в vSphere (пусто = не задано)
+  storagePolicyName: ""
+  # Сеть по умолчанию для всех VM (если группа не переопределила capvs.*.network)
+  network:
+    devices:
+      - networkName: "/Datacenter/network/Mgmt"
+        dhcp4: true
+        # dhcp6: false
+        # gateway4: "10.0.0.1"
+        # ipAddrs:
+        #   - "10.0.0.50/24"
+        # nameservers:
+        #   - "10.0.0.1"
+        # searchDomains:
+        #   - "cluster.local"
+  # Размер VM по умолчанию. Можно переопределить в master.vm или workerNodes.<group>.vm
+  vm:
+    numCPUs: 8
+    memoryMiB: 16384
+    diskGiB: 80
+    # additionalDisksGiB: []
+
+# Конфигурация control plane (master) узлов
+master:
+  replicas: 1
+  # Переопределение размера VM для master
+  vm:
+    numCPUs: 8
+    memoryMiB: 16384
+    diskGiB: 80
+    # additionalDisksGiB: []
+
+  # Переопределение сети для master (опционально, если не задано - берётся capvs.network)
+  # network:
+  #   devices:
+  #     - networkName: "/Datacenter/network/Mgmt"
+  #       dhcp4: true
+
+  # Переопределение vSphere placement для master (опционально)
+  # datacenter: ""
+  # datastore: ""
+  # folder: ""
+  # resourcePool: ""
+  # template: ""
+  # storagePolicyName: ""
+
+  # labels:
+  #   - "my-custom-label-for-master=myvalue"
+  # taints:
+  #   - key: mytaint/master
+  #     effect: NoSchedule
+
+  machineHealthCheck:
+    enabled: true
+    checks:
+      nodeStartupTimeoutSeconds: 0
+      unhealthyNodeConditions:
+        - status: Unknown
+          timeoutSeconds: 600
+          type: Ready
+        - status: "False"
+          timeoutSeconds: 600
+          type: Ready
+    remediation:
+      triggerIf:
+        unhealthyLessThanOrEqualTo: 100%
+
+# Динамическая конфигурация worker-групп. Ключ мапы = имя группы (workers, infra, ingress и т.д.)
+workerNodes:
+  workers:
+    replicas: 1 # кол-во узлов в группе; при autoscaling.enabled — минимум (min-size)
+    # autoscaling: # автомасштабирование группы через Cluster API cluster-autoscaler
+    #   enabled: true
+    #   maxMachines: 6 # максимум узлов (аннотация cluster.x-k8s.io/cluster-api-autoscaler-node-group-max-size); минимум = replicas
+    #   # CAPV создаёт/удаляет VM в vCenter при scale up/down (нужны квота/ресурсы датастора и template).
+    #   # На management-кластере должен существовать ClusterRole shturval-cluster-autoscaler (ставит платформа).
+    #   # При enabled чарт не пишет MachineDeployment.spec.replicas (владеет autoscaler) — иначе helm-drift/template даёт вечный drift.
+    vm:
+      numCPUs: 8
+      memoryMiB: 16384
+      diskGiB: 80
+      # additionalDisksGiB:
+      #   - 200
+    labels: # лейблы Machine/Node (список key=value); для kubeletExtraArgs
+      - "node.longhorn.io/create-default-disk=true"
+      - "my-custom-label-for-worker=myvalue"
+    # taints:
+    #   - key: mytaint/worker
+    #     effect: NoSchedule
+    # network:
+    #   devices:
+    #     - networkName: "/Datacenter/network/Workload"
+    #       dhcp4: true
+    machineHealthCheck:
+      enabled: true
+      checks:
+        nodeStartupTimeoutSeconds: 0
+        unhealthyNodeConditions:
+          - status: Unknown
+            timeoutSeconds: 600
+            type: Ready
+          - status: "False"
+            timeoutSeconds: 600
+            type: Ready
+      remediation:
+        triggerIf:
+          unhealthyLessThanOrEqualTo: 40%
+  infra:
+    replicas: 1
+    vm:
+      numCPUs: 8
+      memoryMiB: 16384
+      diskGiB: 80
+    labels:
+      - "my-custom-label-for-infra=myvalue"
+    # taints:
+    #   - key: mytaint/infra
+    #     effect: NoSchedule
+    machineHealthCheck:
+      enabled: true
+      checks:
+        nodeStartupTimeoutSeconds: 0
+        unhealthyNodeConditions:
+          - status: Unknown
+            timeoutSeconds: 600
+            type: Ready
+          - status: "False"
+            timeoutSeconds: 600
+            type: Ready
+      remediation:
+        triggerIf:
+          unhealthyLessThanOrEqualTo: 40%
+  ingress:
+    replicas: 1
+    vm:
+      numCPUs: 8
+      memoryMiB: 16384
+      diskGiB: 80
+    labels:
+      - "node-role.kubernetes.io/ingress="
+    taints:
+      - key: node-role.kubernetes.io/ingress
+        effect: NoSchedule
+    machineHealthCheck:
+      enabled: true
+      checks:
+        nodeStartupTimeoutSeconds: 0
+        unhealthyNodeConditions:
+          - status: Unknown
+            timeoutSeconds: 600
+            type: Ready
+          - status: "False"
+            timeoutSeconds: 600
+            type: Ready
+      remediation:
+        triggerIf:
+          unhealthyLessThanOrEqualTo: 40%
+
+# Сеть подов в кластере
+podCIDR: 172.16.0.0/16
+# Сеть сервисов в кластере
+serviceCIDR: 10.96.0.0/12
+
+# IP адрес, который будет использоваться для clusterAPI (kube-apiserver) или к которому
+# будет происходить подключение, если используется внешний балансировщик.
+# Для схемы "shturval_nci": в управляющем кластере должен быть развёрнут shturval-vip-provider,
+# он поднимет keepalived на master-узлах и выдаст этот IP как VIP.
+clusterAPI: 10.0.0.100
+# Указываем используется ли внешний балансировщик для clusterAPI или нет
+useExternalKubeAPILB: false
+
+# Ингресс записи от менеджмент кластера (чтобы понимать куда обращаться за аутентификацией, отправкой метрик/логов)
+# Значение применятся только в момент инициализации кластера и изменения ни к чему не приведут.
+authMgmtIngress: "shturval.app.mgmt.example.com"
+logsMgmtIngress: "logs.app.mgmt.example.com"
+metricsMgmtIngress: "vminsert.app.mgmt.example.com"
+
+# Ингресс запись создаваемого кластера (необходим для преднастройки устанавливаемых сервисов)
+ingress: "app.cluster.example.com"
+# IP адрес используемый для Ingress контроллера или внешнего балансировщика
+ingressVip: 10.0.0.101
+# Указываем используется ли внешний балансировщик для Ingress или нет
+useExternalIngressLB: false
+
+# Путь до конфигурации кластера (конфигурация для backend)
+clusterConfigFile: "conf/clusterConfig.yaml"
+# Путь до шаблона ShturvalInit (NCI → /etc/std/nci.json на control-plane)
+nciFile: "conf/nci.yaml"
+
+auditPolicy:
+  # Путь до шаблона audit конфигурации
+  template: "conf/audit_policy_template.yaml"
+  # Путь расположения файла audit на master нодах
+  location: "/etc/kubernetes/audit_policy.yaml"
+
+# Kubeadm patches — патчи для компонентов control plane (kube-apiserver, etcd и любые другие).
+# Каждый ключ кроме directory — отдельный файл в каталоге патчей.
+# Обязательно: patchTemplate. Опционально: filename (для kubeapi по умолчанию kube-apiserver.yaml, иначе <ключ>.yaml).
+# Документация: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/control-plane-flags/#patches
+kubeadmPatches:
+  # Директория с патчами на узле. Создаётся автоматически через preKubeadmCommands.
+  # Обязательно задать, если ниже перечислены патчи.
+  # Рекомендуемое значение: "/etc/kubernetes/manifests-pathes"
+  directory: ""
+  # kubeapi:
+  #   patchTemplate: "conf/kube-apiserver.yaml"
+  #   resources:
+  #     limits:
+  #       memory: "1024Mi"
+  #       cpu: "2"
+  #     requests:
+  #       memory: "500Mi"
+  #       cpu: "250m"
+  # etcd:
+  #   patchTemplate: "conf/etcd.yaml"
+  #   resources:
+  #     limits:
+  #       memory: "500Mi"
+  #       cpu: "2"
+  #     requests:
+  #       memory: "500Mi"
+  #       cpu: "2"
+
+# Настройка NTP
+ntp:
+  ntpservers: []
+  timezone: Europe/Moscow
+
+# secure installation (аудит, шифрование etcd и т.д.)
+secure: true
+
+# Пароль для подключения к opensearch (отправка логов)
+opensearchfluentbitpass: "mysecretpassword"
+
+# Сабчарт настройки VMAlert/VMRule в менеджмент-кластере под этот клиентский кластер
+capvs-cluster-vm:
+  enable: false
+
+# Сабчарт добавления datasource этого кластера в grafana менеджмент-кластера
+capvs-cluster-grafana:
+  enable: false
+
+# Конфигурация ClusterConfig CR
+clusterConfigProfileName: "" # имя профиля кластера (если не указан, используется default-client-cluster-profile)
+clusterType: "client"        # тип кластера: client или platform
+
+# Конфигурация CSI в ClusterConfig (по умолчанию shturval-local-csi без провайдерного секрета)
+# csi:
+#   - defaultStorageClass: true
+#     serviceConfigName: shturval-local-csi
+#   - defaultStorageClass: false
+#     serviceConfigName: shturval-capvs-csi
+#     providerSecretRef:
+#       name: vsphere-csi-ssc
+#       namespace: mycluster
+
+# Конфигурация ACME для ingress сертификатов в ClusterConfig
+# acme:
+#   serverURL: "https://issuer.example.com/acme/directory"
+#   rootCABundle: "<base64>"
+#   email: "admin@example.com"
+
+# Wildcard сертификат для ingress (base64)
+# ingressCert: ""
+# ingressKey: ""
+
+# Intermediate CA для ingress (base64)
+# caCert: ""
+# caKey: ""

@@ -1,0 +1,76 @@
+{{- range $k, $v := .Values.workerNodes }}
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
+kind: KubeadmConfigTemplate
+metadata:
+  name: {{ $.Release.Name }}-{{ $k }}
+  namespace: {{ $.Release.Name }}
+  labels:
+    cluster.x-k8s.io/cluster-name: {{ $.Release.Name }}
+    {{- include "capvs-cluster.labels" $ | nindent 4 }}
+spec:
+  template:
+    spec:
+      {{- if $.Values.etcd.external }}
+      files:
+      - content: {{ include "capvs-cluster.etcd.caCrt" $ }}
+        encoding: base64
+        owner: root:root
+        path: /etc/kubernetes/pki/etcd/ca.crt
+        permissions: "0644"
+      - content: {{ include "capvs-cluster.etcd.apiCrt" $ }}
+        encoding: base64
+        owner: root:root
+        path: /etc/kubernetes/pki/etcd/healthcheck-client.crt
+        permissions: "0644"
+      - content: {{ include "capvs-cluster.etcd.apiKey" $ }}
+        encoding: base64
+        owner: root:root
+        path: /etc/kubernetes/pki/etcd/healthcheck-client.key
+        permissions: "0644"
+      {{- end }}
+      format: cloud-config
+      joinConfiguration:
+        nodeRegistration:
+          criSocket: unix:///run/containerd/containerd.sock
+          imagePullPolicy: IfNotPresent
+          {{- if .labels }}
+          kubeletExtraArgs:
+          - name: node-labels
+            value: {{ join "," .labels | quote }}
+          {{- end }}
+          {{- if .taints }}
+          taints: {{- toYaml .taints | nindent 10 }}
+          {{- end }}
+      postKubeadmCommands:
+      - if [ ! -f /etc/kubernetes/super-admin.conf ]; then ln -s /etc/kubernetes/admin.conf
+        /etc/kubernetes/super-admin.conf ; fi
+      preKubeadmCommands:
+      - sudo mkdir -p /etc/kubernetes
+      - hostname $(cloud-init query --format "{{`{{ ds.meta_data.hostname }}`}}")
+      - echo "::1         ipv6-localhost ipv6-loopback" >/etc/hosts
+      - echo "127.0.0.1   localhost" >>/etc/hosts
+      - echo "127.0.0.1   $(cloud-init query --format "{{`{{ ds.meta_data.hostname }}`}}")" >>/etc/hosts
+      - echo $(cloud-init query --format "{{`{{ ds.meta_data.hostname }}`}}") >/etc/hostname
+      - hostname $(cloud-init query --format "{{`{{ ds.meta_data.hostname }}`}}")
+      - while [ "$(systemctl is-active containerd)" != "active" ]; do echo "Waiting for containerd to come up..."; sleep 3; done
+      - while [ "$(sudo std node status)" != "synched" ]; do echo "Waiting for shturvald to be synced..."; sleep 3; done
+      - |-
+        if [ -f /run/kubeadm/kubeadm.yaml ]; then echo '---
+        apiVersion: kubelet.config.k8s.io/v1beta1
+        kind: KubeletConfiguration
+        {{- include "capvs-cluster.kubelet" $ | nindent 8 }}
+        {{- with .KubeletConfiguration -}}
+        {{ toYaml . | nindent 8 }}
+        {{- end -}}
+        ' >> /run/kubeadm/kubeadm.yaml; fi
+      - |-
+        if [ -f /run/kubeadm/kubeadm-join-config.yaml ]; then echo '---
+        apiVersion: kubelet.config.k8s.io/v1beta1
+        kind: KubeletConfiguration
+        {{- include "capvs-cluster.kubelet" $ | nindent 8 }}
+        {{- with .KubeletConfiguration -}}
+        {{ toYaml . | nindent 8 }}
+        {{- end -}}
+        ' >> /run/kubeadm/kubeadm-join-config.yaml; fi
+---
+{{- end }}

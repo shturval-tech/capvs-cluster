@@ -1,0 +1,15 @@
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: VSphereMachineTemplate
+metadata:
+  name: {{ .Release.Name }}-control-plane
+  namespace: {{ .Release.Name }}
+  labels:
+    cluster-name: {{ .Release.Name }}
+    cluster.x-k8s.io/cluster-name: {{ .Release.Name }}
+    cluster.x-k8s.io/control-plane: "true"
+    {{- include "capvs-cluster.labels" . | nindent 4 }}
+spec:
+  template:
+    metadata: {}
+    spec:
+      {{- include "capvs-cluster.vspheremachine.spec" (dict "group" .Values.master "root" .) | nindent 6 }}
