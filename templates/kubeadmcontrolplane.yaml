@@ -61,7 +61,12 @@ spec:
           certFile: "/etc/kubernetes/pki/etcd/healthcheck-client.crt"
           keyFile: "/etc/kubernetes/pki/etcd/healthcheck-client.key"
       {{- else }}
-        local: {{ toYaml .Values.etcd.local | nindent 10 }}
+        {{- $etcdLocal := merge (dict "imageTag" (include "capvs-cluster.etcdImageTag" .)) (.Values.etcd.local | default dict) }}
+        local: {{ toYaml $etcdLocal | nindent 10 }}
+      {{- end }}
+      {{- if include "capvs-cluster.coreDNSTag" . }}
+      dns:
+        imageTag: {{ include "capvs-cluster.coreDNSTag" . | quote }}
       {{- end }}
       imageRepository: r.shturval.tech
       {{- include "capvs-cluster.scheduler" . | nindent 6 }}
@@ -205,4 +210,4 @@ spec:
       rollingUpdate:
         maxSurge: 1
       type: RollingUpdate
-  version: v{{ .Values.kubeVersion }}
+  version: v{{ include "capvs-cluster.effectiveKubeVersion" . }}

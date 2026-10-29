@@ -1,0 +1,56 @@
+{{- $mode := "auto" -}}
+{{- if .Values.infrastructureProvider -}}
+{{- $mode = .Values.infrastructureProvider.create | default "auto" | toString -}}
+{{- end -}}
+{{- $hasCRD := .Capabilities.APIVersions.Has "cluster.shturval.tech/v1beta1/InfrastructureProvider" -}}
+{{- $want := or (eq $mode "true") (and (eq $mode "auto") $hasCRD) -}}
+{{- if $want -}}
+{{- $name := include "capvs-cluster.capvs.identityName" . -}}
+{{- $ns := "capv-system" -}}
+{{- $found := lookup "cluster.shturval.tech/v1beta1" "InfrastructureProvider" $ns $name -}}
+{{- $owner := "" -}}
+{{- if and $found $found.metadata $found.metadata.annotations -}}
+{{- $owner = index $found.metadata.annotations "meta.helm.sh/release-name" | default "" -}}
+{{- end -}}
+{{- if or (not (and $found $found.metadata)) (eq $owner .Release.Name) }}
+{{- $net := "" -}}
+{{- if and .Values.capvs.network .Values.capvs.network.devices -}}
+{{- $net = (index .Values.capvs.network.devices 0).networkName | default "" -}}
+{{- end }}
+apiVersion: cluster.shturval.tech/v1beta1
+kind: InfrastructureProvider
+metadata:
+  name: {{ $name }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "capvs-cluster.labels" . | nindent 4 }}
+spec:
+  type: capvs
+  templates:
+  - kubeVersion: {{ printf "v%s" (include "capvs-cluster.effectiveKubeVersion" .) | quote }}
+    template: {{ .Values.capvs.template | quote }}
+  providerRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: VSphereClusterIdentity
+    name: {{ $name }}
+  config:
+    vcenterAddress: {{ .Values.capvs.server | quote }}
+    {{- with .Values.capvs.thumbprint }}
+    thumbprint: {{ . | quote }}
+    {{- end }}
+    datacenter: {{ .Values.capvs.datacenter | quote }}
+    datastore: {{ .Values.capvs.datastore | quote }}
+    {{- with .Values.capvs.datastoreURL }}
+    datastoreURL: {{ . | quote }}
+    {{- end }}
+    folder: {{ .Values.capvs.folder | quote }}
+    {{- if $net }}
+    network: {{ $net | quote }}
+    {{- end }}
+    resourcePool: {{ .Values.capvs.resourcePool | quote }}
+    cloneMode: {{ .Values.capvs.cloneMode | quote }}
+    {{- with .Values.capvs.storagePolicyName }}
+    storagePolicyName: {{ . | quote }}
+    {{- end }}
+{{- end }}
+{{- end }}
