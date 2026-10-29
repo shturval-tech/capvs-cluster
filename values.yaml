@@ -80,9 +80,11 @@ ingressControllerType: nginx
 # deletePersistentVolumes: false
 
 infrastructureProvider:
-  # auto — создать InfrastructureProvider, если CRD уже есть и объект не занят другим релизом
-  # true — создать всегда; false — не создавать
-  create: auto
+  # Строка, значение указывать в кавычках: "auto", "true" или "false".
+  #   "auto"  — создать InfrastructureProvider, если CRD уже есть и объект не занят другим релизом
+  #   "true"  — создать всегда
+  #   "false" — не создавать
+  create: "auto"
 
 # Конфигурация etcd
 etcd:
@@ -98,6 +100,14 @@ etcd:
     # Переопределить, если нужно:
     # imageTag: v3.6.14-324917
     # extraArgs: {}
+
+  # Seed-фраза для ключа шифрования etcd (encryption-at-rest).
+  # ОБЯЗАТЕЛЬНА для нового кластера при secure: true: без неё чарт остановит рендер,
+  # так как шифрование не будет безопасным.
+  # При апгрейде уже установленного кластера не нужна: сохраняется прежний ключ.
+  # Сохраните значение: оно понадобится при пересоздании кластера.
+  # Пример: `openssl rand -base64 32`
+  encryptionSeed: ""  # ЗАПОЛНИТЕ для нового кластера, если secure: true
 
 # Инициализация узлов (ShturvalInit / nci.json)
 # Интерфейс для kube-vip VIP; образы pause/kube-vip задаются в images.*
@@ -133,8 +143,10 @@ capvs:
   folder: "/Datacenter/vm/k8s-clusters"
   # Inventory path до ResourcePool
   resourcePool: "/Datacenter/host/Cluster/Resources/pool"
-  # Имя (или path) шаблона VM для клонирования. Должен быть подготовлен заранее (cloud-init + containerd + kubelet)
-  template: "shturval-node-template"
+  # Имя (или path) шаблона VM для клонирования. Должен быть подготовлен заранее (cloud-init + containerd + kubelet).
+  # Обязательно заполнить: чарт остановит рендер, если template пуст.
+  # Значение ниже — пример, замените на свой шаблон.
+  template: "shturval-node-template"  # ПРИМЕР, замените на реальный шаблон
   # Режим клонирования: linkedClone (быстро, требует snapshot на шаблоне) или fullClone
   cloneMode: linkedClone
   # Режим выключения: hard / soft / trySoft

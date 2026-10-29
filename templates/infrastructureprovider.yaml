@@ -28,7 +28,7 @@ spec:
   type: capvs
   templates:
   - kubeVersion: {{ printf "v%s" (include "capvs-cluster.effectiveKubeVersion" .) | quote }}
-    template: {{ .Values.capvs.template | quote }}
+    template: {{ required "capvs.template is required: укажите шаблон VM для клонирования" .Values.capvs.template | quote }}
   providerRef:
     apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
     kind: VSphereClusterIdentity

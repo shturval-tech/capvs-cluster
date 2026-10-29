@@ -59,10 +59,26 @@ r.shturval.tech
 {{- else -}}
 {{- index $existing.data "secret" | b64dec -}}
 {{- end -}}
-{{- else if regexMatch "^2\\.7\\.[0-9]$" .Values.shturvalReleaseVersion -}}
+{{- else -}}
+{{- if .Values.etcd.encryptionSeed -}}
+{{- if regexMatch "^2\\.7\\.[0-9]$" .Values.shturvalReleaseVersion -}}
+{{- substr 0 32 (sha256sum (printf "capvs-enc-v27-%s:%s" (toString .Values.etcd.encryptionSeed) .Release.Name)) -}}
+{{- else -}}
+{{- substr 0 32 (sha256sum (printf "capvs-enc-v1-%s:%s" (toString .Values.etcd.encryptionSeed) .Release.Name)) -}}
+{{- end -}}
+{{- else -}}
+{{- $cc := lookup "cluster.shturval.tech/v1beta1" "ClusterConfig" .Release.Name .Release.Name -}}
+{{- if and $cc $cc.spec -}}
+{{- /* Апгрейд существующего кластера: ключ не меняем. */ -}}
+{{- if regexMatch "^2\\.7\\.[0-9]$" .Values.shturvalReleaseVersion -}}
 {{- substr 0 32 (sha256sum (printf "capvs-enc-v27-%s" .Release.Name)) -}}
 {{- else -}}
 {{- substr 0 32 (sha256sum (printf "capvs-enc-v1-%s" .Release.Name)) -}}
+{{- end -}}
+{{- else -}}
+{{- fail (printf "новый кластер %s: задайте etcd.encryptionSeed в values (случайная строка, например `openssl rand -base64 32`). Без seed шифрование etcd не будет безопасным." .Release.Name) -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 
@@ -284,7 +300,7 @@ os: {{ $group.os | default $capvs.os | default "Linux" | quote }}
 powerOffMode: {{ $group.powerOffMode | default $capvs.powerOffMode | quote }}
 resourcePool: {{ $group.resourcePool | default $capvs.resourcePool | quote }}
 server: {{ $group.server | default $capvs.server | quote }}
-template: {{ $group.template | default $capvs.template | quote }}
+template: {{ $group.template | default (required (printf "capvs.template is required: укажите шаблон VM для группы %s или capvs.template" (default "group" $group.name)) $capvs.template) | quote }}
 {{- with ($group.storagePolicyName | default $capvs.storagePolicyName) }}
 storagePolicyName: {{ . | quote }}
 {{- end }}
