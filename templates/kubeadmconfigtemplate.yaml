@@ -1,3 +1,4 @@
+{{- $ciHostname := "{{ ds.meta_data.hostname }}" -}}
 {{- range $k, $v := .Values.workerNodes }}
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
 kind: KubeadmConfigTemplate
@@ -42,16 +43,15 @@ spec:
           taints: {{- toYaml .taints | nindent 10 }}
           {{- end }}
       postKubeadmCommands:
-      - if [ ! -f /etc/kubernetes/super-admin.conf ]; then ln -s /etc/kubernetes/admin.conf
-        /etc/kubernetes/super-admin.conf ; fi
+      - if [ -f /run/cluster-api/bootstrap-success.complete ] && [ -f /etc/kubernetes/admin.conf ] && [ ! -e /etc/kubernetes/super-admin.conf ] && [ ! -L /etc/kubernetes/super-admin.conf ]; then ln -s /etc/kubernetes/admin.conf /etc/kubernetes/super-admin.conf; fi
       preKubeadmCommands:
       - sudo mkdir -p /etc/kubernetes
-      - hostname $(cloud-init query --format "{{`{{ ds.meta_data.hostname }}`}}")
+      - hostname $(cloud-init query --format "{{ $ciHostname }}")
       - echo "::1         ipv6-localhost ipv6-loopback" >/etc/hosts
       - echo "127.0.0.1   localhost" >>/etc/hosts
-      - echo "127.0.0.1   $(cloud-init query --format "{{`{{ ds.meta_data.hostname }}`}}")" >>/etc/hosts
-      - echo $(cloud-init query --format "{{`{{ ds.meta_data.hostname }}`}}") >/etc/hostname
-      - hostname $(cloud-init query --format "{{`{{ ds.meta_data.hostname }}`}}")
+      - echo "127.0.0.1   $(cloud-init query --format '{{ $ciHostname }}')" >>/etc/hosts
+      - echo $(cloud-init query --format "{{ $ciHostname }}") >/etc/hostname
+      - hostname $(cloud-init query --format "{{ $ciHostname }}")
       - while [ "$(systemctl is-active containerd)" != "active" ]; do echo "Waiting for containerd to come up..."; sleep 3; done
       - while [ "$(sudo std node status)" != "synched" ]; do echo "Waiting for shturvald to be synced..."; sleep 3; done
       - |-
