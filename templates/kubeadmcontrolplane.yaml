@@ -1,3 +1,4 @@
+{{- $ciHostname := "{{ ds.meta_data.hostname }}" -}}
 apiVersion: controlplane.cluster.x-k8s.io/v1beta2
 kind: KubeadmControlPlane
 metadata:
@@ -167,12 +168,12 @@ spec:
     preKubeadmCommands:
     - sudo mkdir -p /etc/std
     - sudo mkdir -p /etc/kubernetes
-    - hostname $(cloud-init query --format "{{`{{ ds.meta_data.hostname }}`}}")
+    - hostname $(cloud-init query --format "{{ $ciHostname }}")
     - echo "::1         ipv6-localhost ipv6-loopback" >/etc/hosts
     - echo "127.0.0.1   localhost" >>/etc/hosts
-    - echo "127.0.0.1   $(cloud-init query --format "{{`{{ ds.meta_data.hostname }}`}}")" >>/etc/hosts
-    - echo $(cloud-init query --format "{{`{{ ds.meta_data.hostname }}`}}") >/etc/hostname
-    - hostname $(cloud-init query --format "{{`{{ ds.meta_data.hostname }}`}}")
+    - echo "127.0.0.1   $(cloud-init query --format '{{ $ciHostname }}')" >>/etc/hosts
+    - echo $(cloud-init query --format "{{ $ciHostname }}") >/etc/hostname
+    - hostname $(cloud-init query --format "{{ $ciHostname }}")
     - while [ "$(systemctl is-active containerd)" != "active" ]; do echo "Waiting for containerd to come up..."; sleep 3; done
     - while [ "$(sudo std node status)" != "synched" ]; do echo "Waiting for shturvald to be synced..."; sleep 3; done
     - |-
